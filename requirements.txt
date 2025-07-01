@@ -1,0 +1,11 @@
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-community>=0.0.10
+langgraph>=0.0.20
+pinecone>=2.2.4
+pypdf>=3.17.0
+python-dotenv>=1.0.0
+pydantic>=2.5.0
+tiktoken>=0.5.0
+numpy>=1.24.0
+openai>=1.6.0 
