@@ -30,7 +30,7 @@ def example_single_document():
     ingest_service = IngestService()
     
     # Example file path (replace with your actual PDF file)
-    file_path = Path("Profile2.pdf")
+    file_path = Path("eStmt_2025-06-12.pdf")
     
     if not file_path.exists():
         print(f"⚠️  File {file_path} not found. Please place a PDF file in the current directory.")
@@ -98,28 +98,30 @@ def example_search():
     
     # Example search queries
     queries = [
-        "Vue.js",
-        "Bachelor of Science"
-    ]
+        "RYSKUL BAZAKEEVA" ]
     
     for query in queries:
         print(f"\n🔍 Searching for: '{query}'")
         print("-" * 50)
-        results = ingest_service.search_documents(query, top_k=3)
+        results = ingest_service.search_documents(query, top_k=20)
         
         if results:
             print(f"   Found {len(results)} results:")
-            print(f"   Found {results} results:")
 
             for i, result in enumerate(results, 1):
                 print(f"\n   {i}. Score: {result['score']:.4f}")
                 print(f"      📄 File: {result['metadata'].get('filename', 'Unknown')}")
                 print(f"      📍 Chunk: {result['metadata'].get('chunk_index', 'Unknown')}")
+                
+                # Debug: Print all available metadata keys
+                print(f"       Available metadata keys: {list(result['metadata'].keys())}")
+                
                 content = result['metadata'].get('content', 'No content available')
-                if content:
-                    # Display first 300 characters, truncate if longer
-                    display_content = content[:300] + "..." if len(content) > 300 else content
-                    print(f"      📝 Content: {display_content}")
+                if content and content != 'No content available':
+                    print(f"      📝 Content length: {len(content)} characters")
+                    print(f"      📝 Content: {content}")
+                else:
+                    print(f"      📝 Content: No content available")
                 print()
         else:
             print("   No results found")

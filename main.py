@@ -11,6 +11,7 @@ from pathlib import Path
 import asyncio
 
 from app.service.ingest_service import IngestService
+from app.interface.console_chat import ConsoleChatInterface
 from config import settings
 
 # Configure logging
@@ -38,6 +39,7 @@ Examples:
   python main.py process-directory /path/to/documents --recursive
   python main.py search "your search query"
   python main.py stats
+  python main.py chat
         """
     )
     
@@ -64,47 +66,38 @@ Examples:
     delete_parser = subparsers.add_parser('delete', help='Delete a document by file hash')
     delete_parser.add_argument('file_hash', type=str, help='File hash of the document to delete')
     
+    # Chat
+    chat_parser = subparsers.add_parser('chat', help='Start interactive chatbot')
+    
     return parser
 
 
-def process_single_file(file_path: str) -> None:
+def process_file(file_path: str) -> None:
     """Process a single PDF file."""
-    path = Path(file_path)
-    
-    if not path.exists():
-        logger.error(f"File not found: {file_path}")
-        return
-    
-    logger.info(f"Processing single file: {file_path}")
+    logger.info(f"Processing file: {file_path}")
     
     ingest_service = IngestService()
-    result = ingest_service.process_single_document(path)
+    result = ingest_service.process_single_document(Path(file_path))
     
     if result.success:
-        logger.info(f"✅ Successfully processed {path.name}")
+        logger.info(f"✅ Successfully processed {file_path}")
         logger.info(f"   - Chunks created: {result.chunks_created}")
         logger.info(f"   - Processing time: {result.processing_time:.2f}s")
         logger.info(f"   - Document ID: {result.document_id}")
     else:
-        logger.error(f"❌ Failed to process {path.name}")
+        logger.error(f"❌ Failed to process {file_path}")
         logger.error(f"   - Error: {result.error_message}")
 
 
 def process_directory(directory_path: str, recursive: bool = False) -> None:
     """Process all PDF files in a directory."""
-    path = Path(directory_path)
-    
-    if not path.exists() or not path.is_dir():
-        logger.error(f"Directory not found: {directory_path}")
-        return
-    
     logger.info(f"Processing directory: {directory_path} (recursive: {recursive})")
     
     ingest_service = IngestService()
-    results = ingest_service.process_directory(path, recursive=recursive)
+    results = ingest_service.process_directory(Path(directory_path), recursive)
     
     if not results:
-        logger.warning("No PDF files found to process")
+        logger.warning("No PDF files found in the directory.")
         return
     
     successful = sum(1 for r in results if r.success)
@@ -115,48 +108,49 @@ def process_directory(directory_path: str, recursive: bool = False) -> None:
     logger.info(f"   - Successful: {successful}")
     logger.info(f"   - Failed: {failed}")
     
-    if failed > 0:
-        logger.info("Failed files:")
-        for result in results:
-            if not result.success:
-                logger.error(f"   - {result.metadata.filename if result.metadata else 'Unknown'}: {result.error_message}")
+    for result in results:
+        if result.success:
+            logger.info(f"   ✅ {result.metadata.filename}: {result.chunks_created} chunks")
+        else:
+            logger.error(f"   ❌ {result.metadata.filename}: {result.error_message}")
 
 
-def search_documents(query: str, top_k: int) -> None:
+def search_documents(query: str, top_k: int = 20) -> None:
     """Search for documents."""
-    logger.info(f"Searching for: '{query}' (top {top_k} results)")
+    logger.info(f"Searching for: {query}")
     
     ingest_service = IngestService()
-    results = ingest_service.search_documents(query, top_k=top_k)
+    results = ingest_service.search_documents(query, top_k)
     
-    if not results:
+    if results:
+        logger.info(f"Found {len(results)} results:")
+        for i, result in enumerate(results, 1):
+            logger.info(f"\n{i}. Score: {result['score']:.4f}")
+            logger.info(f"   File: {result['metadata'].get('filename', 'Unknown')}")
+            logger.info(f"   Chunk: {result['metadata'].get('chunk_index', 'Unknown')}")
+            content = result['metadata'].get('content', 'No content available')
+            logger.info(f"   Content: {content[:200]}...")
+    else:
         logger.info("No results found")
-        return
-    
-    logger.info(f"Found {len(results)} results:")
-    for i, result in enumerate(results, 1):
-        logger.info(f"  {i}. Score: {result['score']:.4f}")
-        logger.info(f"     File: {result['metadata'].get('filename', 'Unknown')}")
-        logger.info(f"     Chunk: {result['metadata'].get('chunk_index', 'Unknown')}")
-        logger.info("")
 
 
 def show_stats() -> None:
     """Show system statistics."""
-    logger.info("📈 System Statistics:")
+    logger.info("Getting system statistics...")
     
     ingest_service = IngestService()
     stats = ingest_service.get_processing_stats()
     
     if "error" in stats:
-        logger.error(f"Error getting stats: {stats['error']}")
+        logger.error(f"❌ Error getting stats: {stats['error']}")
         return
     
-    vector_stats = stats.get("vector_database_stats", {})
-    
+    logger.info("📈 System Statistics:")
     logger.info(f"   - Embedding Model: {stats.get('embedding_model', 'Unknown')}")
     logger.info(f"   - Chunk Size: {stats.get('chunk_size', 'Unknown')}")
     logger.info(f"   - Chunk Overlap: {stats.get('chunk_overlap', 'Unknown')}")
+    
+    vector_stats = stats.get("vector_database_stats", {})
     logger.info(f"   - Total Vectors: {vector_stats.get('total_vector_count', 'Unknown')}")
     logger.info(f"   - Vector Dimension: {vector_stats.get('dimension', 'Unknown')}")
     logger.info(f"   - Index Fullness: {vector_stats.get('index_fullness', 'Unknown')}")
@@ -176,6 +170,14 @@ def delete_document(file_hash: str) -> None:
         logger.info(f"✅ Successfully deleted {deleted_count} vectors")
 
 
+def start_chat() -> None:
+    """Start the interactive chatbot."""
+    logger.info("Starting interactive chatbot...")
+    
+    chat_interface = ConsoleChatInterface()
+    chat_interface.run()
+
+
 def main():
     """Main entry point."""
     parser = setup_argparse()
@@ -187,7 +189,7 @@ def main():
     
     try:
         if args.command == 'process-file':
-            process_single_file(args.file_path)
+            process_file(args.file_path)
         elif args.command == 'process-directory':
             process_directory(args.directory_path, args.recursive)
         elif args.command == 'search':
@@ -196,6 +198,8 @@ def main():
             show_stats()
         elif args.command == 'delete':
             delete_document(args.file_hash)
+        elif args.command == 'chat':
+            start_chat()
         else:
             logger.error(f"Unknown command: {args.command}")
             parser.print_help()

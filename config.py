@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     chunk_size: int = 1000
     chunk_overlap: int = 200
     
+    # LLM Configuration
+    llm_model: str = "gpt-4o"
+    llm_temperature: float = 0.7
+    
     # Document Processing
     max_file_size_mb: int = 50
     
@@ -27,5 +31,5 @@ class Settings(BaseSettings):
         case_sensitive = False
 
 
-# Global settings instance
+# Create global settings instance
 settings = Settings() 

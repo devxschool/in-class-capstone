@@ -67,6 +67,7 @@ class EmbeddingService:
                     metadata={
                         "source_file": chunk.source_file,
                         "chunk_index": chunk.chunk_index,
+                        "content": chunk.content,
                         **chunk.metadata
                     }
                 )
